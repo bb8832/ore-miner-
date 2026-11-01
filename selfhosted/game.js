@@ -28,7 +28,7 @@ function makeGame(db, hooks) {
     p.level = p.level || 1; p.xp = p.xp || 0;
     p.stats = Object.assign({ shippedUnits: 0, listedUnits: 0, contractUnits: 0, boughtUnits: 0, coopSeen: 0 }, p.stats || {});
     p.tech = Object.assign({ drill: 0, haggle: 0, survey: 0, insure: 0 }, p.tech || {});
-    p.quests = p.quests || {}; p.guild = p.guild || null;
+    p.quests = p.quests || {}; p.guild = p.guild || null; p.workers = p.workers || [];
     return p;
   }
   function newPlayer(name, token, ipHash) {
@@ -49,6 +49,7 @@ function makeGame(db, hooks) {
       case 'earned': return Math.floor(p.earned);
       case 'ships': return p.ships.n;
       case 'techLevels': return Object.values(p.tech).reduce((a, b) => a + b, 0);
+      case 'workers': return p.workers.length;
       case 'inGuild': return p.guild && p.level >= 3 ? 1 : 0;
       default: return p.stats[key] || 0;
     }
@@ -128,20 +129,55 @@ function makeGame(db, hooks) {
     const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2));
     return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
   }
-  function stormLoss(sh, p) { // fraction of cargo lost to storms this voyage ran into
-    const s = mineById(sh.site) || W.mineFromId(sh.site), c = cityById.get(sh.city);
-    if (!s || !c) return 0;
-    let hit = false;
+  function stormHit(s, c, t0, t1) { // does a ship sailing s -> c between t0 and t1 pass through a storm while it is active?
     const dx = c.x - s.x, dy = c.y - s.y, l2 = dx * dx + dy * dy || 1e-9;
     for (const e of events) {
       if (e.type !== 'storm') continue;
-      const u = Math.max(0, Math.min(1, ((e.x - s.x) * dx + (e.y - s.y) * dy) / l2)); // where along the route the storm sits
-      const passAt = sh.t0 + u * (sh.t1 - sh.t0);                                       // when the ship passes it
-      if (passAt >= e.start && passAt <= e.until && segDist(e.x, e.y, s.x, s.y, c.x, c.y) < e.r) hit = true;
+      const u = Math.max(0, Math.min(1, ((e.x - s.x) * dx + (e.y - s.y) * dy) / l2));
+      const passAt = t0 + u * (t1 - t0);
+      if (passAt >= e.start && passAt <= e.until && segDist(e.x, e.y, s.x, s.y, c.x, c.y) < e.r) return true;
     }
+    return false;
+  }
+  function stormLoss(sh, p) { // fraction of cargo lost to storms this voyage ran into
+    const s = mineById(sh.site) || W.mineFromId(sh.site), c = cityById.get(sh.city);
+    if (!s || !c) return 0;
+    const hit = stormHit(s, c, sh.t0, sh.t1);
     return hit ? Math.max(0, W.STORM_LOSS * (1 - W.TECHS.insure.per * tech(p, 'insure'))) : 0;
   }
   const rushMult = (s, now) => { for (const e of events) if (e.type === 'rush' && e.until > now && Math.hypot(s.x - e.x, s.y - e.y) < e.r) return 1.8; return 1; };
+
+  // ---------- hired workers ----------
+  function dispatchWorkers(p, now) {
+    if (!p.workers.length) return;
+    const cap = W.shipCap(p.ships.cap), whc = W.whCap(p.ships.wh), spd = W.shipSpd(p.ships.spd);
+    const order = p.workers.slice().sort((a, b) => (p.stock[b.site] || 0) - (p.stock[a.site] || 0));
+    for (const w of order) {
+      const s = W.mineFromId(w.site);
+      if (!s || !p.rigs[w.site]) continue;
+      while (p.shipments.length < p.ships.n) {
+        const have = Math.floor(p.stock[s.id] || 0), need = w.load === 'any' ? Math.min(10, cap) : Math.min(cap, whc);
+        if (have < need) break;
+        let best = null, bestScore = -Infinity;
+        for (const c of W.CITIES) {
+          if (w.dest !== 'best' && w.dest !== 'near' && w.dest !== c.id) continue;
+          const d = W.dist(s, c), t1 = now + (d / spd) * 1000;
+          if (stormHit(s, c, now, t1)) continue;                 // careful workers wait out storms
+          const score = w.dest === 'near' ? -d : unitPrice(c.id, s.ore, p) * W.distBonus(d);
+          if (score > bestScore) { bestScore = score; best = { c, d, t1 }; }
+        }
+        if (!best) break;
+        const qty = Math.min(have, cap);
+        p.stock[s.id] = round2(p.stock[s.id] - qty);
+        p.shipments.push({ id: db.nextId++, site: s.id, city: best.c.id, ore: s.ore, qty, t0: now, t1: best.t1, d: best.d, auto: true });
+      }
+    }
+  }
+  const workerCfg = (m) => {
+    const dest = m.dest === 'best' || m.dest === 'near' || (typeof m.dest === 'string' && cityById.has(m.dest)) ? m.dest : null;
+    const load = m.load === 'full' || m.load === 'any' ? m.load : null;
+    return dest && load ? { dest, load } : null;
+  };
 
   // ---------- simulation tick ----------
   function tick(now, dt) {
@@ -177,10 +213,12 @@ function makeGame(db, hooks) {
         const loss = stormLoss(sh, p), sold = Math.max(0, Math.floor(sh.qty * (1 - loss)));
         const gross = round2(sold * unitPrice(sh.city, sh.ore, p) * W.distBonus(sh.d));
         sat[sh.city][sh.ore] = Math.max(0.35, sat[sh.city][sh.ore] - sold * 0.004);
-        earn(p, gross); p.stats.shippedUnits += sold;
-        hooks.notify(p, { t: 'sale', city: sh.city, amount: gross });
-        hooks.toast(p, `${sold} ${W.ORES[sh.ore].name} reached ${cityById.get(sh.city).name}: +$${gross.toFixed(2)}` + (loss > 0 ? ` (a storm cost you ${sh.qty - sold} units)` : ''));
+        const fee = sh.auto ? round2(gross * W.WORKER_FEE) : 0;
+        earn(p, gross - fee); p.stats.shippedUnits += sold;
+        hooks.notify(p, { t: 'sale', city: sh.city, amount: gross - fee });
+        hooks.toast(p, `${sold} ${W.ORES[sh.ore].name} reached ${cityById.get(sh.city).name}: +$${(gross - fee).toFixed(2)}` + (fee ? ` (worker fee $${fee.toFixed(2)})` : '') + (loss > 0 ? ` (a storm cost you ${sh.qty - sold} units)` : ''));
       }
+      if (isOn || now - (p.lastSeen || now) < 2 * 3600 * 1000) dispatchWorkers(p, now); // workers stop 2 h after you leave
       if (isOn) evalQuests(p);
     }
 
@@ -338,6 +376,29 @@ function makeGame(db, hooks) {
       if (contract.progress >= contract.target) finishContract();
       return null;
     },
+    hire(p, m) {
+      const s = mineById(m.site);
+      if (!s || !p.rigs[s.id]) return 'Hire workers for a mine you work';
+      if (p.workers.some((w) => w.site === s.id)) return 'That mine already has a worker';
+      if (p.workers.length >= W.workerSlots(p.level)) return p.level < 3 ? 'Workers unlock at level 3' : `Worker slots full (${W.workerSlots(p.level)}). Level up for more.`;
+      const cfg = workerCfg(m); if (!cfg) return 'Bad worker settings';
+      const cost = W.workerCost(p.workers.length);
+      if (p.money < cost) return 'Not enough money';
+      p.money = round2(p.money - cost); p.workers.push(Object.assign({ site: s.id }, cfg)); addXp(p, 20);
+      hooks.notify(p, { t: 'research', tech: 'worker' });
+      return null;
+    },
+    setWorker(p, m) {
+      const w = typeof m.site === 'string' && p.workers.find((x) => x.site === m.site);
+      if (!w) return 'No worker at that mine';
+      const cfg = workerCfg(m); if (!cfg) return 'Bad worker settings';
+      Object.assign(w, cfg); return null;
+    },
+    fire(p, m) {
+      const i = typeof m.site === 'string' ? p.workers.findIndex((x) => x.site === m.site) : -1;
+      if (i < 0) return 'No worker at that mine';
+      p.workers.splice(i, 1); return null;
+    },
     // ----- alliances -----
     gCreate(p, m) {
       if (p.guild) return 'You are already in an alliance';
@@ -395,6 +456,7 @@ function makeGame(db, hooks) {
       xpPrev: W.xpFor(p.level), xpNext: p.level >= W.MAX_LEVEL ? null : W.xpFor(p.level + 1),
       stock: p.stock, rigs: p.rigs, rate: p.rate || {}, ships: p.ships, shipments: p.shipments, tech: p.tech,
       quests: p.quests, stats, slots: W.slots(p.level), guild: guildView(p),
+      workers: p.workers, wSlots: W.workerSlots(p.level), wCost: W.workerCost(p.workers.length),
       shipCap: W.shipCap(p.ships.cap), shipSpd: W.shipSpd(p.ships.spd), whCap: W.whCap(p.ships.wh),
     };
   }

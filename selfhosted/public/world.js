@@ -139,6 +139,7 @@
     { id: 'trade20', title: 'Trader', desc: 'Buy 20 ore from other players on the trade board (Trade tab).', stat: 'boughtUnits', goal: 20, money: 150, xp: 50 },
     { id: 'coop', title: 'Teamwork', desc: 'Work a mine at the same time as an established player (they need $100+ earned and a different network).', stat: 'coopSeen', goal: 1, money: 200, xp: 80 },
     { id: 'tech1', title: 'Research', desc: 'Buy your first technology upgrade in the Fleet tab.', stat: 'techLevels', goal: 1, money: 200, xp: 80 },
+    { id: 'hire1', title: 'Delegate', desc: 'Hire a worker in the Fleet tab to ship ore for you automatically.', stat: 'workers', goal: 1, money: 400, xp: 120 },
     { id: 'contr25', title: 'Answer the call', desc: 'Deliver 25 ore to a global contract.', stat: 'contractUnits', goal: 25, money: 300, xp: 100 },
     { id: 'earn5k', title: 'Small fortune', desc: 'Earn $5,000 in total.', stat: 'earned', goal: 5000, money: 500, xp: 200 },
     { id: 'ally', title: 'Stronger together', desc: 'Be in an alliance at level 3 or higher (Ally tab).', stat: 'inGuild', goal: 1, money: 300, xp: 100 },
@@ -147,11 +148,17 @@
     { id: 'earn50k', title: 'Tycoon', desc: 'Earn $50,000 in total.', stat: 'earned', goal: 50000, money: 4000, xp: 800 },
     { id: 'lvl15', title: 'Industry legend', desc: 'Reach player level 15.', stat: 'level', goal: 15, money: 8000, xp: 1500 },
   ];
+  // ---------- hired workers: automatic shipping ----------
+  const WORKER_FEE = 0.10;                                             // share of each worker delivery paid as wages
+  const workerSlots = (lvl) => Math.floor(lvl / 3);                    // level 3 -> 1 worker, 6 -> 2, ...
+  const workerCost = (n) => Math.round(500 * Math.pow(2, n));          // hiring cost, n = workers you already have
+  const WORKER_DEST = { best: 'Best price (avoids storms)', near: 'Nearest port (fast)' };
+  const WORKER_LOAD = { full: 'Wait for a full load', any: 'Go with 10+ ore' };
   const RANKS = [[1, 'Prospector'], [3, 'Digger'], [5, 'Foreman'], [8, 'Mine Boss'], [12, 'Baron'], [16, 'Tycoon'], [22, 'Magnate'], [28, 'Legend']];
   const rankOf = (lvl) => { let r = RANKS[0][1]; for (const [l, n] of RANKS) if (lvl >= l) r = n; return r; };
 
   const W = {
-    MAX_LEVEL, xpFor, ORE_LEVEL, slots, TECHS, techCost, techReqLevel, STORM_LOSS, QUESTS, RANKS, rankOf,
+    MAX_LEVEL, xpFor, ORE_LEVEL, slots, TECHS, techCost, techReqLevel, STORM_LOSS, QUESTS, RANKS, rankOf, WORKER_FEE, workerSlots, workerCost, WORKER_DEST, WORKER_LOAD,
     ORES, LAND, CITIES, MAX, COOP, CELL, MAP_W, MAP_H,
     geo, unGeo, isLand, deposit, quality, mineFromId, mineAt, fbm,
     START_MONEY: 400,
