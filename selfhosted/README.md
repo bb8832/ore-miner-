@@ -22,3 +22,9 @@ npm start              # http://localhost:3000   (PORT, DATA_FILE, ACCOUNTS_PER_
 
 Hosting: same as OreWorld 1 (one long-running Node process; Docker/Render/Fly/VPS; optional Upstash Redis via
 `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` for hosts without a disk). `GET /healthz` for monitoring.
+
+## Where is my progress saved?
+On the server, in `data.json` next to `server.js` (set `DATA_FILE` to move it; the path is printed at startup). It is written every 5 s and on shutdown.
+Your **account key** (🔑 button in the game) is stored only in your browser: save it to log in from another device or address.
+If you lose it on a self-hosted server, open `data.json`, find your name and copy its `"token"`. Paste that in "I already have an account".
+Hosts that wipe the disk on restart (e.g. free tiers) lose `data.json`, so set `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` there.

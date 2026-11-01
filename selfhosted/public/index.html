@@ -106,6 +106,9 @@
   .big { background:linear-gradient(180deg,#2a3f66,#16233d); border:2px solid var(--accent); border-radius:14px; padding:10px 22px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 30px rgba(255,176,46,.35); animation:bigin .4s ease-out, bigout .5s 3.6s forwards; }
   .big h4 { margin:0; color:var(--accent); font-size:18px; letter-spacing:.5px; } .big p { margin:2px 0 0; color:var(--text); }
   @keyframes bigin { from { transform:translateY(-20px) scale(.85); opacity:0 } to { transform:none; opacity:1 } } @keyframes bigout { to { opacity:0; transform:translateY(-12px) } }
+  #acct { position:fixed; inset:0; z-index:8; display:none; align-items:center; justify-content:center; background:rgba(6,10,18,.88); }
+  #acct .box { width:min(480px,92vw); background:linear-gradient(180deg,#1c2a45,#141d31); border:1px solid #3a5080; border-radius:14px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
+  #acct h2 { margin:0 0 8px; color:var(--accent); }
   #intro { position:fixed; inset:0; z-index:8; display:none; align-items:center; justify-content:center; background:rgba(6,10,18,.88); }
   #intro .box { width:min(480px,92vw); background:linear-gradient(180deg,#1c2a45,#141d31); border:1px solid #3a5080; border-radius:14px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.6); }
   #intro h2 { margin:0 0 8px; color:var(--accent); } .steps { padding-left:20px; line-height:1.5; } .steps li { margin:8px 0; }
@@ -124,8 +127,10 @@
   <h2>⛏ OreWorld</h2>
   <p class="dim">Prospect the real world, found mines, ship ore to port cities, research technology, join an alliance and rise from Prospector to Legend.</p>
   <div class="row"><input id="lname" placeholder="Pick a name" maxlength="16" autocomplete="off" style="flex:1"><button class="b" id="lgo">Play</button></div>
+  <details id="lkeybox" style="margin-top:10px"><summary class="dim" style="cursor:pointer">I already have an account (paste my key)</summary><input id="lkey" placeholder="account key (from the 🔑 button)" autocomplete="off" style="width:100%;margin-top:6px"></details>
   <div id="lerr"></div>
 </div></div>
+<div id="acct"><div class="box"><h2>🔑 Your account</h2><p class="dim">Your progress is saved on the server under your name. The <b>account key</b> proves it is you. It is stored in this browser only, so <b>save it</b> to log in from another device, another address, or after clearing your browser data.</p><div class="row"><b id="acname"></b></div><div class="row"><input id="ackey" readonly style="flex:1;font-family:monospace"><button class="b" id="accopy">Copy</button></div><button class="b alt" id="acclose" style="margin-top:8px">Close</button></div></div>
 <div id="intro"><div class="box">
   <h2>Welcome, Prospector!</h2>
   <ol class="steps">
@@ -148,6 +153,7 @@
     <span class="pill dim" id="who"></span>
     <label class="pill" style="cursor:pointer" title="Colour the map by ore type and richness"><input type="checkbox" id="heatbox" checked> 🔍 Prospecting</label>
     <button class="pill btn" id="mutebtn" title="Sound on/off">🔊</button>
+    <button class="pill btn" id="acctbtn" title="Account key: save it to log in anywhere">🔑</button>
   </header>
   <div id="mapwrap"><canvas id="map"></canvas><div id="legend" class="dim"></div><div id="goalbar"></div><div id="eventbar"></div><div id="tip"></div><div id="toasts"></div><div id="zoomhint">scroll to zoom · drag to pan · click land to prospect</div></div>
   <div id="side">
@@ -250,7 +256,7 @@ function connect() {
     else if (m.t === 'research') sfx.quest();
     else if (m.t === 'event') { m.kind === 'storm' ? sfx.storm() : sfx.event(); toast(m.m); }
     else if (m.t === 'kicked') { kicked = true; loggedIn = false; $('lerr').textContent = 'You logged in from another tab/device.'; $('login').style.display = 'flex'; }
-    else if (m.t === 'err') { if (m.login) { $('lerr').textContent = m.m; $('login').style.display = 'flex'; loggedIn = false; } else { sfx.err(); toast(m.m, true); } }
+    else if (m.t === 'err') { if (m.login) { $('lerr').textContent = m.m + (/taken/.test(m.m) ? KEYHINT : ''); $('login').style.display = 'flex'; loggedIn = false; } else { sfx.err(); toast(m.m, true); } }
     else if (m.t === 'chat') addChat(m);
   };
   ws.onclose = () => { if (loggedIn && !kicked) { toast('Disconnected - retrying…', true); setTimeout(connect, 2000); } };
@@ -259,10 +265,15 @@ function login() {
   const name = $('lname').value.trim();
   let token = '';
   try { token = localStorage.getItem('oreworld:' + name.toLowerCase()) || ''; } catch (_) {}
+  const typed = ($('lkey') && $('lkey').value.trim()) || ''; if (typed) token = typed;
   creds = { name, token }; $('lerr').textContent = ''; kicked = false;
   if (ws) { loggedIn = false; try { ws.onclose = null; ws.close(); } catch (_) {} }
   connect();
 }
+const KEYHINT = ' If this is your account, tick "I already have an account" and paste your key (🔑 button in the game, or the token saved in data.json).';
+$('acctbtn').onclick = () => { if (!creds) return; $('acname').textContent = creds.name; $('ackey').value = creds.token; $('acct').style.display = 'flex'; };
+$('acclose').onclick = () => { $('acct').style.display = 'none'; };
+$('accopy').onclick = () => { $('ackey').select(); try { navigator.clipboard.writeText($('ackey').value); toast('Account key copied. Keep it somewhere safe.'); } catch (_) { document.execCommand('copy'); } };
 $('lgo').onclick = login;
 $('lname').onkeydown = e => { if (e.key === 'Enter') login(); };
 $('introgo').onclick = () => { $('intro').style.display = 'none'; try { localStorage.setItem('oreworld2:intro', '1'); } catch (_) {} };

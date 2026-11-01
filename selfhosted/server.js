@@ -219,8 +219,9 @@ setInterval(() => {
   const ms = Number(process.hrtime.bigint() - t0) / 1e6;
   metrics.ticks++; metrics.avgMs = metrics.avgMs * 0.95 + ms * 0.05; metrics.maxMs = Math.max(metrics.maxMs * 0.999, ms);
 }, 1000);
-setInterval(save, 20000);
+setInterval(save, 5000);
 setInterval(kvSave, 30000);
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, async () => { saveSync(); kvBusy = false; try { await kvSave(); } catch (_) { /* ignore */ } process.exit(0); });
 process.on('uncaughtException', (e) => console.error('uncaught', e));
-kvLoad().then(() => server.listen(PORT, '0.0.0.0', () => console.log(`OreWorld 2 running on http://localhost:${PORT}`)));
+process.on('exit', saveSync);
+kvLoad().then(() => server.listen(PORT, '0.0.0.0', () => console.log(`OreWorld 2 running on http://localhost:${PORT}  (progress saved to ${DATA_FILE})`)));
