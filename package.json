@@ -1,0 +1,8 @@
+{
+  "name": "oreworld2",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OreWorld - multiplayer ore mining game (Vercel + Redis)",
+  "engines": { "node": "22.x" },
+  "dependencies": { "topojson-client": "^3.1.0", "world-atlas": "^2.0.2" }
+}
