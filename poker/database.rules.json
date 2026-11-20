@@ -1,0 +1,69 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".indexOn": ["last"],
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "usernames": {
+      ".read": true,
+      "$name": {
+        ".write": "auth != null && (!data.exists() || data.val() === auth.uid) && (!newData.exists() || newData.val() === auth.uid)",
+        ".validate": "!newData.exists() || ($name.matches(/^[a-z0-9_]{3,16}$/) && newData.isString())"
+      }
+    },
+    "status": {
+      ".read": "auth != null",
+      "$uid": { ".write": "auth != null && auth.uid === $uid" }
+    },
+    "requests": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": { ".write": "auth != null && (auth.uid === $from || auth.uid === $to)" }
+      }
+    },
+    "invites": {
+      "$to": {
+        ".read": "auth != null && auth.uid === $to",
+        "$from": { ".write": "auth != null && (auth.uid === $from || auth.uid === $to)" }
+      }
+    },
+    "tables": {
+      "$code": {
+        ".validate": "$code.matches(/^[a-z0-9]{4,8}$/)",
+        "host": {
+          ".read": "auth != null",
+          ".write": "auth != null && ((newData.exists() && newData.child('uid').val() === auth.uid) || (!newData.exists() && data.child('uid').val() === auth.uid))"
+        },
+        "state": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('tables').child($code).child('host/uid').val() === auth.uid"
+        },
+        "here": {
+          ".read": "auth != null",
+          "$uid": { ".write": "auth != null && auth.uid === $uid" }
+        },
+        "sits": {
+          ".read": "auth != null",
+          "$uid": { ".write": "auth != null && (auth.uid === $uid || root.child('tables').child($code).child('host/uid').val() === auth.uid)" }
+        },
+        "actions": {
+          ".read": "auth != null",
+          "$id": { ".write": "auth != null && ((newData.exists() && newData.child('uid').val() === auth.uid) || (!newData.exists() && root.child('tables').child($code).child('host/uid').val() === auth.uid))" }
+        },
+        "chat": {
+          ".read": "auth != null",
+          ".write": "auth != null && newData.child('uid').val() === auth.uid"
+        },
+        "hole": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && root.child('tables').child($code).child('host/uid').val() === auth.uid"
+          }
+        }
+      }
+    }
+  }
+}

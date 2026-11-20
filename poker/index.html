@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>All-In Island Poker</title>
+<meta name="description" content="Texas Hold'em with friends, AI players and an island of tables.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Limelight&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a late-night island casino poster, playful but tidy
+   IDEA: a treasure map of card rooms; each stop is a richer table
+   PICTURE: the illustrated island map, then the felt table with its dealer
+   COLOUR and TYPE: deep lagoon ground, felt green, coral accent, Snap yellow for friends; Limelight + Outfit
+   LAYOUT: top bar, map as hero with side panel; table fills the screen; friends slide in from the right */
+:root{color-scheme:dark;--bg:#06262d;--bg2:#0b3a43;--ink:#f6f1e7;--mut:#9fc3c4;--felt:#11704f;--felt2:#0a4f38;--rail:#5a2c1a;--coral:#ff6b57;--gold:#f4c95d;--snap:#fffc00;--card:#fffdf8;--red:#d6283a}
+:root[data-theme=light],:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Outfit,system-ui,sans-serif;overflow-x:clip;min-height:100vh}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;min-height:44px;padding:0 16px;font-weight:600;color:var(--ink);background:#ffffff1a}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.45;cursor:not-allowed}
+.pri{background:var(--coral);color:#fff}.gold{background:var(--gold);color:#2a1a05}.ghost{background:transparent;border:1px solid #ffffff33}
+input{font:inherit;font-size:16px;min-height:44px;border-radius:12px;border:1px solid #ffffff33;background:#00000033;color:var(--ink);padding:0 12px}
+h1,h2,h3{font-family:Limelight,Georgia,serif;font-weight:400;line-height:1.05;margin:0;text-wrap:balance}
+.top{display:flex;align-items:center;gap:8px;padding:10px max(3vw,12px);background:#041c21;position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.logo{font-family:Limelight,serif;font-size:22px;color:var(--gold);margin-right:auto;white-space:nowrap}
+.pill{display:flex;align-items:center;gap:8px;background:#ffffff14;border-radius:999px;padding:4px 12px 4px 4px;min-height:40px;white-space:nowrap}
+.chip{width:30px;height:30px;border-radius:50%;background:radial-gradient(circle,var(--gold) 0 38%,#b8862a 40% 52%,var(--gold) 54%);border:3px dashed #fff7;flex:none}
+.lv{position:relative;width:32px;height:32px;flex:none}.lv b{position:absolute;inset:0;display:grid;place-items:center;font-size:13px}
+.fbtn{background:var(--snap);color:#111;position:relative}.badge{position:absolute;top:-6px;right:-6px;background:var(--coral);color:#fff;border-radius:999px;font-size:12px;min-width:20px;height:20px;display:grid;place-items:center;padding:0 5px}
+.home{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;padding:20px max(3vw,12px);max-width:1300px;margin:auto}
+.mapwrap{background:var(--bg2);border-radius:24px;overflow:hidden;position:relative}
+.mapwrap svg{display:block;width:100%;height:auto}
+.node{cursor:pointer}.node:hover .lm,.node:focus .lm{transform:translateY(-6px)}.lm{transition:transform .25s}
+.node.locked{cursor:pointer}.node.locked .lm{filter:grayscale(1) brightness(.7)}
+.side{display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--bg2);border-radius:20px;padding:18px}
+.panel h2{font-size:26px;margin-bottom:6px}.panel p{margin:4px 0 12px;color:var(--mut)}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1 1 auto}
+.xpbar{height:10px;border-radius:9px;background:#00000040;overflow:hidden;margin:8px 0}.xpbar i{display:block;height:100%;background:linear-gradient(90deg,var(--coral),var(--gold))}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}.stats b{display:block;font-size:22px}.stats span{font-size:13px;color:var(--mut)}
+/* table */
+.tablev{padding:10px max(2vw,8px) 20px;max-width:1100px;margin:auto}
+.tbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.dealer{display:flex;align-items:center;gap:12px;flex:1 1 320px}
+.dealer svg{width:76px;height:76px;flex:none;border-radius:50%}
+.say{background:var(--card);color:#1b1b1b;border-radius:16px 16px 16px 4px;padding:8px 14px;font-size:15px;position:relative}
+.say small{display:block;color:#6a5a4a;font-size:13px}
+.code{font-weight:800;letter-spacing:.06em;background:#ffffff14;padding:8px 12px;border-radius:10px;white-space:nowrap}
+.felt{position:relative;aspect-ratio:16/9;margin:44px 6% 70px;border-radius:999px;background:radial-gradient(ellipse at 50% 40%,var(--felt),var(--felt2) 75%);box-shadow:0 0 0 14px var(--rail),0 0 0 17px #8a4b2a,0 24px 50px #0008,inset 0 0 60px #0006}
+.felt::after{content:"";position:absolute;inset:18px;border-radius:999px;border:2px solid #ffffff1a;pointer-events:none}
+.center{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:8px;z-index:2}
+.board{display:flex;gap:6px}
+.pot{background:#0006;border-radius:999px;padding:4px 14px;font-weight:800;white-space:nowrap}
+.card{width:44px;height:62px;border-radius:7px;background:var(--card);color:#1a1a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;font-size:19px;line-height:1;box-shadow:0 3px 6px #0005;flex:none;animation:deal .3s ease-out}
+.card span{font-size:20px}.card.r{color:var(--red)}
+.card.back{background:repeating-linear-gradient(45deg,#c23b2e 0 6px,#a82c22 6px 12px);border:3px solid #fff}
+.card.slot{background:#ffffff10;box-shadow:none;border:2px dashed #ffffff26;animation:none}
+.card.sm{width:34px;height:48px;font-size:15px}.card.sm span{font-size:15px}
+.card.dim{opacity:.4}
+@keyframes deal{from{transform:translateY(-14px) rotate(-6deg);opacity:0}}
+.seat{position:absolute;transform:translate(-50%,-50%);width:118px;display:flex;flex-direction:column;align-items:center;z-index:3}
+.seat .cards{display:flex;gap:3px;margin-bottom:-12px;z-index:1}
+.plate{background:#04191dee;border:2px solid #ffffff22;border-radius:14px;padding:12px 8px 6px;width:100%;text-align:center;position:relative}
+.seat.turn .plate{border-color:var(--gold);box-shadow:0 0 0 3px #f4c95d55}
+.seat.fold{opacity:.5}.seat.win .plate{border-color:var(--snap);box-shadow:0 0 18px #fffc0088}
+.seat.me .plate{background:#2a0f0aee}
+.nm{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk{font-size:13px;color:var(--gold);font-weight:800}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:14px;color:#fff;position:absolute;top:-16px;left:-8px;border:2px solid #04191d}
+.la{position:absolute;top:-12px;right:-6px;background:var(--coral);color:#fff;border-radius:8px;font-size:12px;padding:1px 7px;font-weight:800}
+.btn-d{position:absolute;width:24px;height:24px;border-radius:50%;background:#fff;color:#111;font-size:12px;font-weight:800;display:grid;place-items:center;bottom:-10px;right:-8px;box-shadow:0 2px 4px #0006}
+.bet{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;font-size:13px;font-weight:800;z-index:2;white-space:nowrap}
+.bet .chip{width:20px;height:20px;border-width:2px}
+.hn{font-size:12px;color:var(--snap);font-weight:800}
+.tm{position:absolute;left:8px;right:8px;bottom:2px;height:3px;border-radius:3px;background:var(--gold);transform-origin:left}
+.bubble{position:absolute;top:-44px;left:50%;transform:translateX(-50%);background:var(--snap);color:#111;border-radius:12px;padding:3px 10px;font-weight:800;font-size:13px;white-space:nowrap;animation:pop .2s}
+@keyframes pop{from{transform:translateX(-50%) scale(.5)}}
+.actions{background:#041c21;border-radius:20px;padding:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-height:68px}
+.actions .grow{flex:1 1 220px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.actions input[type=range]{flex:1 1 140px;accent-color:var(--gold);min-height:0;border:0;padding:0}
+.raiseval{font-weight:800;min-width:70px;text-align:right;white-space:nowrap}
+.wait{color:var(--mut);flex:1}
+.qc button{min-height:36px;padding:0 10px;font-size:14px;background:#ffffff12}
+/* friends drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:#fff;color:#111;z-index:40;transform:translateX(105%);transition:transform .25s;display:flex;flex-direction:column;box-shadow:-10px 0 40px #0007}
+.drawer.open{transform:none}
+.dhead{background:var(--snap);padding:14px 16px 10px}
+.dhead h2{font-family:Outfit,sans-serif;font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:space-between}
+.dhead input{width:100%;background:#fff;border-color:#0002;color:#111;margin-top:8px}
+.tabs{display:flex;gap:6px;margin-top:10px}.tabs button{flex:1;background:#0000000f;color:#111;min-height:38px;font-size:14px;position:relative}.tabs button.on{background:#111;color:var(--snap)!important}
+.flist{overflow:auto;flex:1;padding:6px 0}
+.fr{display:flex;align-items:center;gap:12px;padding:8px 16px;border-bottom:1px solid #0000000d}
+.fr img,.fr .ini{width:46px;height:46px;border-radius:50%;flex:none;object-fit:cover;border:3px solid #ddd;display:grid;place-items:center;font-weight:800;color:#fff}
+.fr .on{border-color:#2ecc71}.fr .info{flex:1}.fr .info b{display:block}.fr .info small{color:#666}
+.fr button{min-height:38px;padding:0 12px;font-size:14px;background:#111;color:#fff}.fr button.y{background:var(--snap);color:#111;border:1px solid #0002}
+.streak{display:flex;align-items:center;gap:2px;font-weight:800;font-size:14px;color:#e8590c;white-space:nowrap}
+.empty{padding:30px 20px;color:#666;text-align:center}
+.sec{padding:10px 16px 2px;font-size:13px;font-weight:800;color:#888}
+/* modal + toast */
+.modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:50;padding:16px}
+.mbox{background:var(--bg2);border-radius:24px;padding:22px;width:min(460px,100%);max-height:92vh;overflow:auto}
+.mbox h2{font-size:32px}.mbox .dl{display:flex;gap:14px;align-items:center;margin-bottom:12px}.mbox .dl svg{width:90px;height:90px;border-radius:50%;flex:none}
+.facts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}.facts div{background:#0003;border-radius:12px;padding:8px 12px}.facts span{display:block;font-size:13px;color:var(--mut)}.facts b{font-size:18px}
+.opts{display:grid;gap:8px}.opts button{text-align:left;padding:10px 16px;min-height:56px}.opts small{display:block;font-weight:400;opacity:.85;font-size:13px}
+.toasts{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(420px,92vw)}
+.toast{background:#111;color:#fff;border-radius:14px;padding:10px 14px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 24px #0008;animation:pop2 .2s}
+.toast.inv{background:var(--snap);color:#111}.toast span{flex:1}.toast button{min-height:36px;padding:0 12px}
+@keyframes pop2{from{transform:translateY(20px);opacity:0}}
+.note{font-size:13px;color:var(--mut)}
+.auth{max-width:440px;margin:6vh auto;padding:0 16px}
+.auth .panel{padding:24px}.auth h1{font-size:44px;color:var(--gold);margin-bottom:6px}
+.auth form{display:grid;gap:10px;margin-top:14px}.auth label{font-size:14px;color:var(--mut);display:grid;gap:4px}
+.err{color:#ff9b8c;min-height:1.2em;font-size:14px;margin:0}
+.link{background:none;padding:0;min-height:32px;color:var(--gold);text-decoration:underline;font-weight:600}
+body:not(.authed) .top .pill,body:not(.authed) .top .fbtn{display:none}
+[hidden]{display:none!important}
+@media(max-width:900px){.home{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){.top{flex-wrap:nowrap}.fbtn{padding:0 12px}#meName{display:none}.top .pill{padding-right:10px}.felt{aspect-ratio:3/4;margin:40px 10% 64px}.seat{width:84px}.card{width:36px;height:52px;font-size:16px}.card span{font-size:16px}.card.sm{width:26px;height:38px;font-size:12px}.card.sm span{font-size:12px}.nm{font-size:12px}.logo{font-size:18px}.dealer svg{width:56px;height:56px}.pill{padding-right:8px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<header class="top">
+ <div class="logo">All-In Island</div>
+ <div class="pill" title="Your chips"><div class="chip"></div><b id="chips">10,000</b></div>
+ <button class="pill" id="meBtn" style="padding:4px 12px 4px 4px"><span class="lv" id="lvRing"></span><span id="meName">You</span></button>
+ <button class="fbtn" id="fBtn">Friends<span class="badge" id="fBadge" hidden>0</span></button>
+</header>
+
+
+<main id="auth" class="auth">
+ <div class="panel">
+  <h1>All-In Island</h1>
+  <p>Texas Hold'em with your friends, AI players and an island full of tables.</p>
+  <div class="tabs" style="margin-top:14px"><button type="button" data-at="up" class="on" style="color:inherit">Create account</button><button type="button" data-at="in" style="color:inherit">Log in</button></div>
+  <form id="authForm" novalidate>
+   <label id="unWrap">Username<input id="aUser" maxlength="16" autocomplete="username" placeholder="3-16 letters, numbers or _"></label>
+   <label>Email<input id="aEmail" type="email" autocomplete="email"></label>
+   <label>Password<input id="aPass" type="password" autocomplete="new-password" placeholder="At least 6 characters"></label>
+   <p class="err" id="aErr" role="alert"></p>
+   <button class="pri" id="aGo">Create account</button>
+  </form>
+  <div class="row" style="justify-content:space-between;margin-top:8px"><button class="link" id="aForgot" type="button" hidden>Forgot password?</button><button class="link" id="aOffline" type="button">Play solo offline</button></div>
+  <p class="note" id="aNote"></p>
+ </div>
+</main>
+<main id="home" class="home" hidden>
+ <section>
+  <div class="mapwrap" id="map"></div>
+ </section>
+ <aside class="side">
+  <div class="panel">
+   <h2>Pick your table</h2>
+   <p>Tap a spot on the island. Higher stakes open up as you level up, and the AI gets sharper the further you go.</p>
+   <div class="row"><button class="pri" id="quick">Quick solo game</button></div>
+  </div>
+  <div class="panel">
+   <h2>Got a code?</h2>
+   <p>Join a friend's private table.</p>
+   <form class="row" id="codeForm"><input id="codeIn" maxlength="6" placeholder="e.g. k7pqx" aria-label="Table code" autocomplete="off"><button class="gold">Join</button></form>
+  </div>
+  <div class="panel" id="bonusPanel">
+   <h2>Daily chips</h2>
+   <p id="bonusTxt">Grab free chips once a day.</p>
+   <button class="gold" id="bonusBtn">Claim 2,500</button>
+  </div>
+  <p class="note" id="netNote">Connecting to the island…</p>
+ </aside>
+</main>
+
+<main id="table" class="tablev" hidden>
+ <div class="tbar">
+  <div class="dealer" id="dealerBox"></div>
+  <span class="code" id="tCode"></span>
+  <button class="fbtn" id="inviteBtn" hidden>Invite</button>
+  <button class="ghost" id="leaveBtn">Leave table</button>
+ </div>
+ <div class="felt" id="felt"></div>
+ <div class="actions" id="actions"></div>
+</main>
+
+<aside class="drawer" id="drawer" aria-label="Friends">
+ <div class="dhead">
+  <h2>Friends <button id="fClose" style="background:#0001;color:#111;min-height:38px;font-size:15px" aria-label="Close" >Close</button></h2>
+  <input id="fSearch" placeholder="Search people to add" autocomplete="off">
+  <div class="tabs"><button data-tab="friends" class="on">My friends</button><button data-tab="added">Added me<span class="badge" id="addedBadge" hidden></span></button><button data-tab="quick">Quick add</button></div>
+ </div>
+ <div class="flist" id="flist"></div>
+</aside>
+<div id="modalRoot"></div>
+<div class="toasts" id="toasts"></div>
+<script src="engine.js"></script>
+<script type="module" src="app.js"></script>
+</body></html>
