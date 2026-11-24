@@ -100,12 +100,13 @@ $('#bonusBtn').onclick=()=>{if(prof.bonusDay!==today()){prof.bonusDay=today();pr
 
 /* ---------- chip codes ---------- */
 // Codes are stored as SHA-256 hashes so the real code isn't readable in the source. Each works once per account.
-const CODES={'0a711e831fadc6c41f3f55053d732056950b86abedecc92e8c4a1adfb18e7176':50000};
-async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
-$('#redeemForm').onsubmit=async e=>{e.preventDefault();const inp=$('#redeemIn');const code=inp.value.trim().toUpperCase().replace(/\s+/g,'');if(!code)return;
- const h=await sha(code),amt=CODES[h];if(!amt){toast('That code doesn\'t work.');return}
+const CODES={'4e64189d06e34eb23f9ca3daf4ebad55f8a2e12aaad7742fed4abb9e37b84299':50000};
+async function sha(s){if(!(window.crypto&&crypto.subtle))throw new Error('no crypto');const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+async function redeem(e){e&&e.preventDefault();const inp=$('#redeemIn');const code=inp.value.toUpperCase().replace(/[^A-Z0-9]/g,'');if(!code)return;
+ let h;try{h=await sha(code)}catch(x){toast('Codes need the https:// version of the site.');return}const amt=CODES[h];if(!amt){toast('That code doesn\'t work.');return}
  prof.redeemed=prof.redeemed||{};if(prof.redeemed[h.slice(0,16)]){toast('You already used that code.');return}
- prof.redeemed[h.slice(0,16)]=true;prof.chips+=amt;save();renderMap();inp.value='';toast(`+${amt.toLocaleString()} chips!`)};
+ prof.redeemed[h.slice(0,16)]=true;prof.chips+=amt;save();renderMap();inp.value='';toast(`+${amt.toLocaleString()} chips!`)}
+{const rf=$('#redeemForm');if(rf)rf.onsubmit=redeem}
 
 /* ---------- map ---------- */
 const NODES=[[150,470],[330,320],[540,450],[640,215],[850,390],[830,110]];
